@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, TextInput, Button, Text, Alert } from 'react-native';
+import { View, TextInput, Text, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSession } from '../ctx';
 import { useRouter } from 'expo-router';
 
@@ -21,37 +21,86 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View style={{ padding: 20 }}>
-      <Text style={{ marginBottom: 5 }}>Email:</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Create Account</Text>
+
       <TextInput
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
-        placeholder="Enter your email"
-        style={{ borderWidth: 1, padding: 8, marginBottom: 15 }}
+        placeholder="Email"
+        style={styles.input}
       />
 
-      <Text style={{ marginBottom: 5 }}>Password:</Text>
       <TextInput
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        placeholder="Enter your password"
-        style={{ borderWidth: 1, padding: 8, marginBottom: 20 }}
+        placeholder="Password"
+        style={styles.input}
       />
 
-      <Button title="Register" onPress={handleRegister} />
+      <TouchableOpacity style={styles.button} onPress={handleRegister}>
+        <Text style={styles.buttonText}>Register</Text>
+      </TouchableOpacity>
 
-      <Text style={{ marginTop: 15, textAlign: 'center' }}>
+      <Text style={styles.signInText}>
         Already have an account?{' '}
-        <Text
-          style={{ color: 'blue' }}
-          onPress={() => router.push('/sign-in')}
-        >
+        <Text style={styles.signInLink} onPress={() => router.push('/sign-in')}>
           Sign In
         </Text>
       </Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 30,
+    backgroundColor: '#f8f9fa',
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 40,
+    textAlign: 'center',
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    fontSize: 16,
+  },
+  button: {
+    backgroundColor: '#4f46e5',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  signInText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+  },
+  signInLink: {
+    color: '#4f46e5',
+    fontWeight: 'bold',
+  },
+});
