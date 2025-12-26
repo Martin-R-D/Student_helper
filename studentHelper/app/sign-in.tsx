@@ -14,7 +14,7 @@ export default function SignIn() {
     try {
       await signIn(email, password);
       Alert.alert('Success', 'Logged in!');
-      router.replace('/'); // Navigate to protected/home screen
+      router.replace('/home'); 
     } catch (err: any) {
       Alert.alert('Login Failed', err.message);
     }
