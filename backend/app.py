@@ -10,11 +10,12 @@ CORS(app)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///db.sqlite3"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["JWT_SECRET_KEY"] = "unique_key_123"
+
+
 db = SQLAlchemy(app)
-
-
-app.config["JWT_SECRET_KEY"] = "change-this-later"
 jwt = JWTManager(app)
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -26,7 +27,6 @@ class User(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
 
 
 @app.post("/auth/register")
@@ -66,8 +66,44 @@ def login():
     if not user or not user.check_password(password):
         return {"message": "Invalid credentials"}, 401
 
-    token = create_access_token(identity=user.id)
+    token = create_access_token(identity=str(user.id))
     return {"access_token": token}
+
+
+@app.get("/auth/myInfo")
+@jwt_required()
+def get_current_user():
+    print("AAAAAAAAA")
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return {"message": "User not found"}, 404
+
+    return {"id": user.id,"email": user.email}
+
+
+
+@app.post("/auth/change_password")
+@jwt_required()
+def change_password():
+    data = request.get_json()
+    new_password = data.get("password")
+
+    if not isinstance(new_password, str):
+        return {"message": "Invalid password"}, 400
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return {"message": "User not found"}, 404
+
+    user.set_password(new_password)
+    db.session.commit()
+
+    return {"message": "Password updated successfully"}
+
 
 
 if __name__ == "__main__":
