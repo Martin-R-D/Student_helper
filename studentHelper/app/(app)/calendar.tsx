@@ -1,19 +1,27 @@
-import { View, Text, Button } from 'react-native';
-import { useSession } from '../../ctx';
-import { router } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { Calendar } from 'react-native-calendars';
 
-export default function CalendarPage() {
-  const { signOut } = useSession();
+const API_URL = "http://192.168.0.105:5000/events"; 
 
-  const handleSignOut = () => {
-    signOut();        
-    router.replace('/sign-in');
-  };
+export default function CalendarScreen() {
+  const [markedDates, setMarkedDates] = useState({});
+
+  useEffect(() => {
+    fetch(API_URL)
+      .then(res => res.json())
+      .then(data => {
+        const formatted: Record<string, { marked: boolean; dotColor: string; selected: boolean }> = {};
+        Object.keys(data).forEach(date => {
+          formatted[date] = { marked: true, dotColor: 'blue', selected: true };
+        });
+        setMarkedDates(formatted);
+      });
+  }, []);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Calendar Page</Text>
-      <Button title="Sign Out" onPress={handleSignOut} />
-    </View>
+    <Calendar
+      markedDates={markedDates}
+      onDayPress={(day) => console.log('selected day', day)}
+    />
   );
 }

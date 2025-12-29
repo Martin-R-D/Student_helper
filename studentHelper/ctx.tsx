@@ -28,7 +28,7 @@ export function useSession() {
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [[isLoading, session], setSession] = useStorageState('session');
-  const API_URL = "http://192.168.100.12:5000";
+  const API_URL = "http://192.168.0.105:5000";
   const signIn = async (email: string, password: string) => {
     const res = await fetch(`${API_URL}/auth/login`, {
       method: "POST",

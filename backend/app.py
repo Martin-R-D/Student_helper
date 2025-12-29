@@ -8,6 +8,11 @@ from flask_sqlalchemy import SQLAlchemy
 app = Flask(__name__)
 CORS(app)
 
+events = {
+    '2025-12-25': [{'title': 'Christmas Party', 'time': '10:00 AM'}],
+    '2025-12-31': [{'title': 'New Years Eve', 'time': '11:59 PM'}]
+}
+
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///db.sqlite3"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
@@ -69,6 +74,9 @@ def login():
     token = create_access_token(identity=user.id)
     return {"access_token": token}
 
+@app.route('/events', methods=['GET'])
+def get_events():
+    return jsonify(events)
 
 if __name__ == "__main__":
     with app.app_context():
