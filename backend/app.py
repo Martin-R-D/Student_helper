@@ -3,7 +3,11 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
+import os
+import requests
 
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -73,7 +77,6 @@ def login():
 @app.get("/auth/myInfo")
 @jwt_required()
 def get_current_user():
-    print("AAAAAAAAA")
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
@@ -105,6 +108,47 @@ def change_password():
     return {"message": "Password updated successfully"}
 
 
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    data_in = request.json
+    user_message = data_in.get("message")
+
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
+
+    API_KEY = os.getenv("OPENROUTER_API_KEY") 
+    API_URL = 'https://openrouter.ai/api/v1/chat/completions'
+
+    headers = {
+        'Authorization': f'Bearer {API_KEY}',
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        "model": "nex-agi/deepseek-v3.1-nex-n1:free", #deepseek/deepseek-r1-0528:free
+        "messages": [
+            {"role": "user", "content": user_message}
+        ]
+    }
+
+    try:
+        response = requests.post(API_URL, json=payload, headers=headers)
+
+        if response.status_code == 200:
+            result = response.json()
+            ai_reply = result['choices'][0]['message']['content']
+            
+            return jsonify({
+                "status": "success",
+                "reply": ai_reply
+            })
+        else:
+            print(f"OpenRouter Error: {response.text}")
+            return jsonify({"error": f"API Error: {response.status_code}"}), response.status_code
+
+    except Exception as e:
+        print(f"System Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     with app.app_context():
