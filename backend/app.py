@@ -6,6 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import os
 import requests
+import datetime
 
 load_dotenv()
 
@@ -36,6 +37,14 @@ class User(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    sender = db.Column(db.String(10), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 
 @app.post("/auth/register")
@@ -116,14 +125,39 @@ def change_password():
     return {"message": "Password updated successfully"}
 
 
+@app.route('/chat/history', methods=['GET'])
+@jwt_required()
+def get_chat_history():
+    user_id = int(get_jwt_identity())
+    messages = Message.query.filter_by(user_id=user_id).order_by(Message.timestamp.asc()).all()
+    
+    output = []
+    for msg in messages:
+        output.append({
+            'id': str(msg.id),
+            'text': msg.text,
+            'from': msg.sender
+        })
+    
+    return jsonify({'messages': output})
+
 
 @app.route('/chat', methods=['POST'])
+@jwt_required()
 def chat():
+    user_id = int(get_jwt_identity())
     data_in = request.json
     user_message = data_in.get("message")
 
     if not user_message:
         return jsonify({"error": "No message provided"}), 400
+
+
+    new_msg = Message(user_id=user_id, text=user_message, sender='user')
+    db.session.add(new_msg)
+    db.session.commit()
+
+
 
     API_KEY = os.getenv("OPENROUTER_API_KEY") 
     API_URL = 'https://openrouter.ai/api/v1/chat/completions'
@@ -146,6 +180,10 @@ def chat():
             result = response.json()
             ai_reply = result['choices'][0]['message']['content']
             
+            new_ai_msg = Message(user_id=user_id, text=ai_reply, sender='ai')
+            db.session.add(new_ai_msg)
+            db.session.commit() 
+
             return jsonify({
                 "status": "success",
                 "reply": ai_reply

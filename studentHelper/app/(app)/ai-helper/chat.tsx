@@ -1,20 +1,52 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { API_URL } from '../../../config/api';
+import { useSession } from '../../../ctx'
 
 type Message = {
   id: string;
   text: string;
   from: 'user' | 'ai';
+  timestamp?: string;
 };
 
 export default function AiHelperScreen() {
+  const { session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false); 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  
+  useEffect(() => {
+    if (session) {
+      loadChatHistory();
+    }
+  }, [session]);
+
+  const loadChatHistory = async () => {
+    try {
+      const response = await fetch(`${API_URL}/chat/history`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setMessages(data.messages || []); 
+      }
+    } catch (error) {
+      console.error("Failed to load history:", error);
+    } finally {
+      setIsInitialLoading(false);
+    }
+  };
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !session) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -23,15 +55,18 @@ export default function AiHelperScreen() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
+
     try {
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${session}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: currentInput }),
       });
 
       const data = await response.json();
@@ -45,17 +80,20 @@ export default function AiHelperScreen() {
         setMessages(prev => [...prev, aiMessage]);
       }
     } catch (error) {
-      console.error("Error calling Flask:", error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "Sorry, I couldn't connect to the server.",
-        from: 'ai',
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      console.error("Error calling backend:", error);
+      Alert.alert("Connection Error", "Couldn't reach the AI helper.");
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isInitialLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#2563eb" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -96,51 +134,84 @@ export default function AiHelperScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#F5F7FB',
   },
   messages: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
   message: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-    maxWidth: '80%',
+    maxWidth: '82%',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 24,
+    marginBottom: 16,
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   userMessage: {
-    backgroundColor: '#2563eb',
     alignSelf: 'flex-end',
+    backgroundColor: '#b5cfdfff',
+    borderBottomRightRadius: 4,
   },
   aiMessage: {
-    backgroundColor: '#1e293b',
     alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   messageText: {
-    color: '#fff',
+    fontSize: 16,
+    lineHeight: 24,
+    letterSpacing: 0.3,
   },
+
   inputRow: {
     flexDirection: 'row',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: 'transparent',
   },
   input: {
     flex: 1,
-    backgroundColor: '#020617',
-    color: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    marginRight: 12,
+    fontSize: 16,
+    color: '#1A202C',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   sendButton: {
-    marginLeft: 8,
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
-    paddingHorizontal: 16,
+    backgroundColor: '#10B981',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   sendText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 });
