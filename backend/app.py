@@ -196,6 +196,67 @@ def chat():
         print(f"System Error: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/chat/examAnalyse', methods=['POST'])
+@jwt_required()
+def anayseExam():
+    data_in = request.json
+    image_b64 = data_in.get("image")
+
+    if not image_b64:
+        return jsonify({"error": "No image provided"}), 400
+    
+    instruction = "Analyze this exam paper. Identify all incorrect answers, explain why they are wrong, and provide the correct solutions. If there isnt exam paper on the image just say: Please import exam image!"
+
+    content_payload = [
+        {
+            "type": "text", 
+            "text": instruction
+        },
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{image_b64}"
+            }
+        }
+    ]
+
+    API_KEY = os.getenv("OPENROUTER_API_KEY")
+    API_URL = 'https://openrouter.ai/api/v1/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {API_KEY}',
+        'Content-Type': 'application/json',
+    }
+
+    payload = {
+        "model": "nvidia/nemotron-nano-12b-v2-vl:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": content_payload
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(API_URL, json=payload, headers=headers)
+
+        if response.status_code == 200:
+            result = response.json()
+            ai_reply = result['choices'][0]['message']['content']
+            print(ai_reply)
+            return jsonify({
+                "status": "success",
+                "reply": ai_reply
+            })
+        else:
+            return jsonify({"error": "AI Service Error", "details": response.text}), response.status_code
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all() 
