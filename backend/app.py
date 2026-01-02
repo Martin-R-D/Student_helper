@@ -148,7 +148,7 @@ def create_event():
 @jwt_required()
 def get_current_user():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return {"message": "User not found"}, 404
@@ -167,7 +167,7 @@ def change_password():
         return {"message": "Invalid password"}, 400
 
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return {"message": "User not found"}, 404
@@ -259,7 +259,7 @@ def anayseExam():
     if not image_b64:
         return jsonify({"error": "No image provided"}), 400
     
-    instruction = "Analyze this exam paper. Identify all incorrect answers, explain why they are wrong, and provide the correct solutions. If there isnt exam paper on the image just say: Please import exam image!"
+    instruction = "Analyze this exam paper. Identify all incorrect answers, explain why they are wrong, and provide the correct solutions. If there isnt exam paper on the image just say: Please import exam image! Also make the response correspond to the used language in the provided test!"
 
     content_payload = [
         {
@@ -282,7 +282,7 @@ def anayseExam():
     }
 
     payload = {
-        "model": "nvidia/nemotron-nano-12b-v2-vl:free",
+        "model": "google/gemma-3-4b-it:free", #nvidia/nemotron-nano-12b-v2-vl:free
         "messages": [
             {
                 "role": "user",
