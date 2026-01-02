@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
+from datetime import timedelta
 import os
 import requests
 import datetime
@@ -18,6 +19,7 @@ events = {}
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///db.sqlite3"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = "unique_key_123"
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
 
 
 db = SQLAlchemy(app)
