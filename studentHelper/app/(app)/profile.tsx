@@ -7,26 +7,38 @@ export default function Profile() {
   const { session, signOut } = useSession();
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
-  fetch(`${API_URL}/auth/myInfo`, {
-    headers: {
-      Authorization: `Bearer ${session}`,
-    },
-  })
-    .then(res => {
-      if (!res.ok) {
-        throw new Error(`Server responded with status: ${res.status}`);
-      }
-      return res.json();
+    fetch(`${API_URL}/auth/myInfo`, {
+      headers: {
+        Authorization: `Bearer ${session}`,
+      },
     })
-    .then(data => setEmail(data.email))
-    .catch((err) => {
-      console.log("Fetch error:", err);
-    });
-}, [session]);
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Server responded with status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => setEmail(data.email))
+      .catch((err) => {
+        console.log("Fetch error:", err);
+      });
+  }, [session]);
 
   const changePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in both password fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      alert("Err");
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/auth/change_password`, {
         method: 'POST',
@@ -37,12 +49,16 @@ export default function Profile() {
         body: JSON.stringify({ password: newPassword }),
       });
 
-      if (!res.ok) throw new Error();
+      const data = await res.json();
 
-      Alert.alert('Success', 'Password updated');
+      if (!res.ok) throw new Error(data.error || 'Update failed');
+
+      Alert.alert('Success', 'Password updated successfully');
+      alert("Password updated!");
       setNewPassword('');
-    } catch {
-      Alert.alert('Error', 'Failed to change password');
+      setConfirmPassword('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to change password');
     }
   };
 
@@ -58,6 +74,14 @@ export default function Profile() {
         secureTextEntry
         value={newPassword}
         onChangeText={setNewPassword}
+        style={styles.input}
+      />
+
+      <TextInput
+        placeholder="Confirm new password"
+        secureTextEntry
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
         style={styles.input}
       />
 
