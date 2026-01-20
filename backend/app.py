@@ -6,7 +6,9 @@ from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 from datetime import timedelta, timezone, datetime
 import os
-import requests
+import base64
+from google import genai
+from google.genai import types
 
 load_dotenv()
 
@@ -196,6 +198,8 @@ def change_password():
 
 
 
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
 @app.route('/chat/message', methods=['POST'])
 @jwt_required()
 def handle_chat():
@@ -209,8 +213,7 @@ def handle_chat():
     if not user_text and not image_b64:
         return jsonify({"error": "Empty message"}), 400
 
-    
-    chat_session = ChatSession.query.get(session_id)
+    chat_session = db.session.get(ChatSession, session_id)
     if not chat_session:
         title_preview = user_text[:30] if user_text else "Image Shared"
         chat_session = ChatSession(id=session_id, user_id=user_id, title=title_preview)
@@ -220,48 +223,51 @@ def handle_chat():
     db.session.add(user_db_msg)
     db.session.commit()
 
-    history = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.asc()).limit(15).all()
+    history_msgs = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
     
-    messages_payload = []
-    for msg in history:
-        messages_payload.append({
-            "role": msg.role,
-            "content": msg.content
-        })
+    gemini_history = []
+    for msg in history_msgs[:-1]:
+        if msg.content and msg.content.strip():
+            role = "user" if msg.role == "user" else "model"
+            gemini_history.append(
+                types.Content(role=role, parts=[types.Part.from_text(text=msg.content)])
+            )
 
+    current_parts = []
+    if user_text:
+        current_parts.append(types.Part.from_text(text=user_text))
+    
     if image_b64:
-        messages_payload[-1]["content"] = [
-            {"type": "text", "text": user_text if user_text else "What is in this image?"},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
-        ]
-
-    API_KEY = os.getenv("OPENROUTER_API_KEY")
-    headers = {
-        'Authorization': f'Bearer {API_KEY}',
-        'Content-Type': 'application/json',
-    }
-    
-    payload = {
-        "model": "google/gemma-3-4b-it:free",
-        "messages": messages_payload
-    }
+        if "," in image_b64:
+            image_b64 = image_b64.split(",")[1]
+        
+        image_data = base64.b64decode(image_b64.strip())
+        current_parts.append(types.Part.from_bytes(data=image_data, mime_type="image/jpeg"))
+        
+        if not user_text:
+            current_parts.insert(0, types.Part.from_text(text="Describe this image."))
 
     try:
-        response = requests.post('https://openrouter.ai/api/v1/chat/completions', json=payload, headers=headers)
-        
-        if response.status_code == 200:
-            result = response.json()
-            ai_reply = result['choices'][0]['message']['content']
-            
-            ai_db_msg = ChatMessage(session_id=session_id, role='assistant', content=ai_reply)
-            db.session.add(ai_db_msg)
-            db.session.commit()
+        chat = client.chats.create(
+            model="gemini-flash-latest",
+            history=gemini_history
+        )
 
-            return jsonify({"status": "success", "id": ai_db_msg.id, "reply": ai_reply})
-        else:
-            return jsonify({"error": "AI Service Error"}), response.status_code
+        response = chat.send_message(message=current_parts)
+        ai_reply = response.text
+        
+        ai_db_msg = ChatMessage(session_id=session_id, role='assistant', content=ai_reply)
+        db.session.add(ai_db_msg)
+        db.session.commit()
+
+        return jsonify({
+            "status": "success", 
+            "id": ai_db_msg.id, 
+            "reply": ai_reply
+        })
 
     except Exception as e:
+        print(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
