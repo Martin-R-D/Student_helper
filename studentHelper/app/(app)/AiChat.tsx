@@ -8,10 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../../config/api';
 import { useSession } from '../../ctx';
-import Markdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css'; 
+import Markdown from 'react-native-markdown-display'
 
 const TOP_PADDING = Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10;
 
@@ -187,10 +184,7 @@ export default function ExamTutorScreen() {
               <View style={[styles.bubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
                 {msg.image && <Image source={{ uri: msg.image }} style={styles.chatImage} />}
                 <Text style={[styles.msgText, msg.role === 'user' ? styles.userText : styles.aiText]}>
-                  <Markdown
-                    remarkPlugins={[remarkMath]} 
-                    rehypePlugins={[rehypeKatex]}
-                  >{msg.content}</Markdown>
+                  <Markdown>{msg.content}</Markdown>
                 </Text>
               </View>
             </View>

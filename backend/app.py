@@ -256,6 +256,14 @@ def handle_chat():
     try:
         chat = client.chats.create(
             model="gemini-flash-latest",
+            config=types.GenerateContentConfig(
+                system_instruction="""
+                You are a helpful student assistant. 
+                IMPORTANT: Always format mathematical formulas using standard Markdown code blocks or inline backticks. 
+                Example: `x = y^2`. 
+                Strictly avoid using LaTeX symbols like $, $$, or \[ \]. 
+                """
+            ),
             history=gemini_history
         )
 
