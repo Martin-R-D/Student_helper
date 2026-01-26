@@ -4,6 +4,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Calendar } from 'react-native-calendars';
 import { API_URL } from '../../config/api';
 import { useSession } from '../../ctx'
+import { Platform, StatusBar } from 'react-native';
+
+const TOP_PADDING = Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10;
 
 type EventType = 'homework' | 'test' | 'project';
 
@@ -339,6 +342,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    paddingTop: TOP_PADDING,
   },
   addButtonContainer: {
     backgroundColor: '#00adf5',
