@@ -170,6 +170,36 @@ def create_event():
         db.session.rollback()
         return {"message": "Failed to create event", "error": str(e)}, 500
 
+
+@app.route('/events/delete', methods=['POST'])
+@jwt_required()
+def delete_event():
+    current_user_id = get_jwt_identity()
+    data = request.get_json()
+
+    date = data.get('date')
+    description = data.get('description')
+
+    if not date or not description:
+        return jsonify({"error": "Missing date or description"}), 400
+    
+    event_to_delete = Event.query.filter_by(
+        user_id=current_user_id,
+        date=date,
+        description=description
+    ).first()
+
+    if not event_to_delete:
+        return jsonify({"error": "Event not found"}), 404
+    
+    try:
+        db.session.delete(event_to_delete)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Event deleted"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 @app.get("/auth/myInfo")
 @jwt_required()
 def get_current_user():

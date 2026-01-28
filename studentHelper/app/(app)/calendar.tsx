@@ -5,6 +5,7 @@ import { Calendar } from 'react-native-calendars';
 import { API_URL } from '../../config/api';
 import { useSession } from '../../ctx'
 import { Platform, StatusBar } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const TOP_PADDING = Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10;
 
@@ -47,49 +48,76 @@ export default function CalendarScreen() {
   };
 
 
-
-  //AI scan
   const handleAIScan = async () => {
-  const permission = await ImagePicker.requestCameraPermissionsAsync();
-  if (!permission.granted) {
-    Alert.alert('Permission Denied', 'We need camera access to scan your schedule.');
-    return;
-  }
-  const result = await ImagePicker.launchCameraAsync({
-    base64: true,
-    quality: 0.4,
-  });
-
-  if (!result.canceled && result.assets[0].base64) {
-    setIsScanning(true);
-    try {
-      const response = await fetch(`${API_URL}/chat/extract-events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session}`,
-        },
-        body: JSON.stringify({ image: result.assets[0].base64 }),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        Alert.alert('Success', `AI found and added ${data.events.length} events!`);
-        fetchEvents(); 
-      } else {
-        Alert.alert('AI Error', data.error || 'Could not process the image.');
-      }
-    } catch (err) {
-      Alert.alert('Network Error', 'Connection to server failed.');
-    } finally {
-      setIsScanning(false);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Denied', 'We need camera access to scan your schedule.');
+      return;
     }
-  }
-};
+    const result = await ImagePicker.launchCameraAsync({
+      base64: true,
+      quality: 0.4,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      setIsScanning(true);
+      try {
+        const response = await fetch(`${API_URL}/chat/extract-events`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session}`,
+          },
+          body: JSON.stringify({ image: result.assets[0].base64 }),
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          Alert.alert('Success', `AI found and added ${data.events.length} events!`);
+          fetchEvents(); 
+        } else {
+          Alert.alert('AI Error', data.error || 'Could not process the image.');
+        }
+      } catch (err) {
+        Alert.alert('Network Error', 'Connection to server failed.');
+      } finally {
+        setIsScanning(false);
+      }
+    }
+  };
 
 
+  const handleDeleteEvent = async (eventToDelete: CalendarEvent) => {
+    Alert.alert("Delete Event", "Are you sure you want to remove this event?",
+      [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", 
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_URL}/events/delete`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session}`
+                },
+                body: JSON.stringify({
+                  date: selectedDate,
+                  description: eventToDelete.description
+                }),
+              });
 
+              if (response.ok) {
+                fetchEvents();
+              } else {
+                Alert.alert('Error', 'Failed to delete event');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Connection error');
+            }
+          } 
+        }
+      ]
+    );
+  };
 
 
 
@@ -283,6 +311,9 @@ export default function CalendarScreen() {
             >
               <Text style={styles.eventType}>{event.type.toUpperCase()}</Text>
               <Text style={styles.eventDescription}>{event.description}</Text>
+              <TouchableOpacity onPress={() => handleDeleteEvent(event)} style={styles.deleteButton}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
             </View>
           ))}
         </View>
@@ -470,5 +501,14 @@ const styles = StyleSheet.create({
   eventDescription: {
     fontSize: 14,
     color: '#333',
+  },
+  eventContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 10,
   },
 });
