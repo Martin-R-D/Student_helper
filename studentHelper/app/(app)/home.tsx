@@ -140,7 +140,7 @@ export default function HomePage() {
             <Text style={styles.scoreLabel}>Tests Completed</Text>
           </View>
           <View style={[styles.scoreItem, styles.scoreBorder]}>
-            <Text style={[styles.scoreValue, { color: '#10b981' }]}>
+            <Text style={[styles.scoreValue, { color: (scores?.avg_percentage || 0) <= 50 ? '#ef4444' : '#10b981' }]}>
               {scores?.avg_percentage || 0}%
             </Text>
             <Text style={styles.scoreLabel}>Avg. Accuracy</Text>

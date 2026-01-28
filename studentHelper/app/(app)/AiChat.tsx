@@ -166,57 +166,52 @@ export default function ExamTutorScreen() {
           <Ionicons name="add-circle-outline" size={30} color="#2563eb" />
         </TouchableOpacity>
       </View>
-
-      <ScrollView 
-        ref={scrollViewRef}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        contentContainerStyle={styles.chatList}
-      >
-        {!currentChat || currentChat.messages.length === 0 ? (
-          <View style={styles.welcomeContainer}>
-            <Ionicons name="chatbubbles-outline" size={80} color="#cbd5e1" />
-            <Text style={styles.welcomeTitle}>New Conversation</Text>
-            <Text style={styles.welcomeSub}>Send a message!</Text>
-          </View>
-        ) : (
-          currentChat.messages.map((msg) => (
-            <View key={msg.id} style={[styles.msgWrapper, msg.role === 'user' ? styles.userRow : styles.aiRow]}>
-              <View style={[styles.bubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
-                {msg.image && <Image source={{ uri: msg.image }} style={styles.chatImage} />}
-                <Text style={[styles.msgText, msg.role === 'user' ? styles.userText : styles.aiText]}>
-                  <Markdown>{msg.content}</Markdown>
-                </Text>
-              </View>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} style={{flex:1}}>
+        <ScrollView ref={scrollViewRef} onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} contentContainerStyle={styles.chatList}>
+          {!currentChat || currentChat.messages.length === 0 ? (
+            <View style={styles.welcomeContainer}>
+              <Ionicons name="chatbubbles-outline" size={80} color="#cbd5e1" />
+              <Text style={styles.welcomeTitle}>New Conversation</Text>
+              <Text style={styles.welcomeSub}>Send a message!</Text>
             </View>
-          ))
-        )}
-        {loading && <ActivityIndicator color="#2563eb" style={{ alignSelf: 'flex-start', marginLeft: 20, marginTop: 10 }} />}
-      </ScrollView>
+          ) : (
+            currentChat.messages.map((msg) => (
+              <View key={msg.id} style={[styles.msgWrapper, msg.role === 'user' ? styles.userRow : styles.aiRow]}>
+                <View style={[styles.bubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
+                  {msg.image && <Image source={{ uri: msg.image }} style={styles.chatImage} />}
+                  <Text style={[styles.msgText, msg.role === 'user' ? styles.userText : styles.aiText]}>
+                    <Markdown>{msg.content}</Markdown>
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+          {loading && <ActivityIndicator color="#2563eb" style={{ alignSelf: 'flex-start', marginLeft: 20, marginTop: 10 }} />}
+        </ScrollView>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
-        {selectedImage && (
-          <View style={styles.imagePreviewContainer}>
-            <Image source={{ uri: selectedImage.uri }} style={styles.smallPreview} />
-            <TouchableOpacity style={styles.removeImage} onPress={() => setSelectedImage(null)}>
-              <Ionicons name="close-circle" size={24} color="#ef4444" />
+          {selectedImage && (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: selectedImage.uri }} style={styles.smallPreview} />
+              <TouchableOpacity style={styles.removeImage} onPress={() => setSelectedImage(null)}>
+                <Ionicons name="close-circle" size={24} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={styles.inputContainer}>
+            <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}>
+              <Ionicons name="image-outline" size={28} color="#64748b" />
+            </TouchableOpacity>
+            <TextInput 
+              style={styles.textInput} 
+              placeholder="Type a message..." 
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+            />
+            <TouchableOpacity style={styles.sendIcon} onPress={handleSendMessage}>
+              <Ionicons name="paper-plane" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
-        )}
-        <View style={styles.inputContainer}>
-          <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}>
-            <Ionicons name="image-outline" size={28} color="#64748b" />
-          </TouchableOpacity>
-          <TextInput 
-            style={styles.textInput} 
-            placeholder="Type a message..." 
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-          />
-          <TouchableOpacity style={styles.sendIcon} onPress={handleSendMessage}>
-            <Ionicons name="paper-plane" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
       </KeyboardAvoidingView>
 
       <Modal visible={isHistoryVisible} animationType="fade" transparent={true}>

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  TextInput, ActivityIndicator, Alert, Platform, StatusBar 
+  TextInput, ActivityIndicator, Alert, Platform, StatusBar, KeyboardAvoidingView 
 } from 'react-native';
 import { useSession } from '../../ctx';
 import { useFocusEffect } from 'expo-router';
@@ -177,6 +177,7 @@ export default function TestGeneratorScreen() {
   }
 
   return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} style={{flex:1}}>
     <ScrollView style={styles.container}>
       <Text style={styles.headerTitle}>AI Study Coach</Text>
       <Text style={styles.subTitle}>Select an upcoming test to prepare.</Text>
@@ -223,6 +224,7 @@ export default function TestGeneratorScreen() {
         </View>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
