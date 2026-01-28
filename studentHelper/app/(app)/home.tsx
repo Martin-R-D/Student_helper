@@ -15,47 +15,61 @@ const TOP_PADDING = Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) 
 export default function HomePage() {
   const { signOut, session } = useSession();
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [scores, setScores] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
- useFocusEffect(
+  useFocusEffect(
     useCallback(() => {
       fetchUpcomingEvents();
+      fetchScores();
     }, [session])
   );
 
-const fetchUpcomingEvents = async () => {
-  try {
-    const response = await fetch(`${API_URL}/events`, {
-      headers: { 'Authorization': `Bearer ${session}` }
-    });
-    const data = await response.json();
+  const fetchUpcomingEvents = async () => {
+    try {
+      const response = await fetch(`${API_URL}/events`, {
+        headers: { 'Authorization': `Bearer ${session}` }
+      });
+      const data = await response.json();
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const formatted = Object.keys(data).flatMap(dateStr => {
+        const eventDate = new Date(dateStr + "T00:00:00"); 
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+        const diffTime = eventDate.getTime() - today.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-    const formatted = Object.keys(data).flatMap(dateStr => {
-      const eventDate = new Date(dateStr + "T00:00:00"); 
-  
-      const diffTime = eventDate.getTime() - today.getTime();
-      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0) {
+          return data[dateStr].map((event: any) => ({
+            ...event,
+            date: dateStr,
+            daysLeft: diffDays
+          }));
+        }
+        return [];
+      }).sort((a, b) => a.daysLeft - b.daysLeft);
 
-      if (diffDays >= 0) {
-        return data[dateStr].map((event: any) => ({
-          ...event,
-          date: dateStr,
-          daysLeft: diffDays
-        }));
-      }
-      return [];
-    }).sort((a, b) => a.daysLeft - b.daysLeft);
+      setUpcomingEvents(formatted);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    setUpcomingEvents(formatted);
-  } catch (e) {
-    console.error(e);
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchScores = async () => {
+    try {
+      const response = await fetch(`${API_URL}/recent-scores`, {
+        headers: { 'Authorization': `Bearer ${session}` }
+      });
+      const data = await response.json();
+      setScores(data); 
+    } catch (e) {
+      console.error("Failed to fetch scores", e);
+    }
+  };
 
   const handleSignOut = () => {
     signOut();        
@@ -116,6 +130,24 @@ const fetchUpcomingEvents = async () => {
           </View>
         ))}
       </View>
+
+
+      <View style={styles.scoreSection}>
+        <Text style={styles.sectionTitle}>Performance</Text>
+        <View style={styles.scoreCard}>
+          <View style={styles.scoreItem}>
+            <Text style={styles.scoreValue}>{scores?.total_tests || 0}</Text>
+            <Text style={styles.scoreLabel}>Tests Completed</Text>
+          </View>
+          <View style={[styles.scoreItem, styles.scoreBorder]}>
+            <Text style={[styles.scoreValue, { color: '#10b981' }]}>
+              {scores?.avg_percentage || 0}%
+            </Text>
+            <Text style={styles.scoreLabel}>Avg. Accuracy</Text>
+          </View>
+        </View>
+      </View>
+      <View style={{ height: 40 }} /> 
     </ScrollView>
   );
 }
@@ -133,11 +165,26 @@ const styles = StyleSheet.create({
   actionGrid: { flexDirection: 'row', paddingHorizontal: 20, gap: 15 },
   actionBtn: { flex: 1, backgroundColor: '#fff', padding: 20, borderRadius: 20, alignItems: 'center', elevation: 2 },
   actionText: { marginTop: 8, fontWeight: '600', color: '#1e293b' },
-  listSection: { padding: 20 },
+  listSection: { paddingHorizontal: 20, paddingVertical: 10 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 15 },
   listItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 16, marginBottom: 10 },
   itemTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
   itemDate: { fontSize: 12, color: '#94a3b8' },
   daysTag: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  daysTagText: { fontWeight: 'bold', color: '#64748b' }
+  daysTagText: { fontWeight: 'bold', color: '#64748b' },
+  scoreSection: { paddingHorizontal: 20, marginBottom: 20 },
+  scoreCard: { 
+    flexDirection: 'row', 
+    backgroundColor: '#fff', 
+    borderRadius: 20, 
+    padding: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+  },
+  scoreItem: { flex: 1, alignItems: 'center' },
+  scoreBorder: { borderLeftWidth: 1, borderLeftColor: '#f1f5f9' },
+  scoreValue: { fontSize: 24, fontWeight: 'bold', color: '#1e293b' },
+  scoreLabel: { fontSize: 12, color: '#64748b', marginTop: 4 }
 });

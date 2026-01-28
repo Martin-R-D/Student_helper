@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func, cast, Float
 from dotenv import load_dotenv
 from datetime import timedelta, timezone, datetime
 from google import genai
@@ -40,15 +41,6 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-
-class Message(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, nullable=False)
-    text = db.Column(db.Text, nullable=False)
-    sender = db.Column(db.String(10), nullable=False)
-    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-
-
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -72,6 +64,14 @@ class ChatMessage(db.Model):
     has_image = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
+
+class Score(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    subject = db.Column(db.String(100), nullable=False)
+    score_value = db.Column(db.Integer, nullable=False)
+    total = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 @app.post("/auth/register")
@@ -418,6 +418,50 @@ def generate_test():
     except Exception as e:
         print(f"Error generating test: {e}")
         return jsonify({"error": "Failed to connect to AI"}), 500
+
+
+
+@app.route('/save-score', methods=['POST'])
+@jwt_required()
+def save_score():
+    user_id = get_jwt_identity()
+    data = request.json
+    
+    subject = data.get('subject')
+    score_value = data.get('score')
+    total = data.get('total') 
+    
+    new_entry = Score(
+        user_id=user_id,
+        subject=subject,
+        score_value=score_value,
+        total=total
+    )
+    
+    db.session.add(new_entry)
+    db.session.commit()
+    print(new_entry)
+    return jsonify({"message": "Score saved!", "id": new_entry.id}), 201
+
+
+@app.route('/recent-scores', methods=['GET'])
+@jwt_required()
+def get_user_stats():
+    user_id = get_jwt_identity()
+    
+    stats = db.session.query(
+        func.count(Score.id).label('total_tests'),
+        func.avg(cast(Score.score_value, Float) / Score.total).label('avg_score')
+    ).filter(Score.user_id == user_id).first()
+
+    avg_perc = round((stats.avg_score or 0) * 100, 1)
+
+    return jsonify({
+        "total_tests": stats.total_tests or 0,
+        "avg_percentage": avg_perc
+    })
+
+
 
 if __name__ == "__main__":
     with app.app_context():

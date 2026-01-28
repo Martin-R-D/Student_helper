@@ -76,7 +76,7 @@ export default function TestGeneratorScreen() {
     }
   };
 
-  const calculateScore = () => {
+  const calculateScore = async () => {
     if (Object.keys(userAnswers).length < (quiz?.length || 0)) {
         return Alert.alert("Unfinished", "Please answer all questions before finishing.");
     }
@@ -85,6 +85,23 @@ export default function TestGeneratorScreen() {
       if (userAnswers[index] === q.correct) correctCount++;
     });
     setScore(correctCount);
+
+    try {
+      await fetch(`${API_URL}/save-score`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session}`
+        },
+        body: JSON.stringify({
+          subject: selectedTest.description,
+          score: correctCount,
+          total: quiz?.length
+        })
+      });
+      } catch (error) {
+        console.error("Failed to save score:", error);
+      }
   };
 
   const resetQuiz = () => {
