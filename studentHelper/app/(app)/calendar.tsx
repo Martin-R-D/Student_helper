@@ -6,6 +6,7 @@ import { API_URL } from '../../config/api';
 import { useSession } from '../../ctx'
 import { Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown, ZoomIn, FadeInRight, Layout } from 'react-native-reanimated';
 
 const TOP_PADDING = Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10;
 
@@ -35,7 +36,7 @@ export default function CalendarScreen() {
       const response = await fetch(`${API_URL}/events`, {
         method: 'GET',
         headers: {
-          'Content-Type':'application/json',
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${session}`
         }
       });
@@ -72,10 +73,10 @@ export default function CalendarScreen() {
         });
 
         const data = await response.json();
-        
+
         if (response.ok) {
           Alert.alert('Success', `AI found and added ${data.events.length} events!`);
-          fetchEvents(); 
+          fetchEvents();
         } else {
           Alert.alert('AI Error', data.error || 'Could not process the image.');
         }
@@ -90,31 +91,32 @@ export default function CalendarScreen() {
 
   const handleDeleteEvent = async (eventToDelete: CalendarEvent) => {
     Alert.alert("Delete Event", "Are you sure you want to remove this event?",
-      [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", 
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_URL}/events/delete`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${session}`
-                },
-                body: JSON.stringify({
-                  date: selectedDate,
-                  description: eventToDelete.description
-                }),
-              });
+      [{ text: "Cancel", style: "cancel" }, {
+        text: "Delete", style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await fetch(`${API_URL}/events/delete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session}`
+              },
+              body: JSON.stringify({
+                date: selectedDate,
+                description: eventToDelete.description
+              }),
+            });
 
-              if (response.ok) {
-                fetchEvents();
-              } else {
-                Alert.alert('Error', 'Failed to delete event');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Connection error');
+            if (response.ok) {
+              fetchEvents();
+            } else {
+              Alert.alert('Error', 'Failed to delete event');
             }
-          } 
+          } catch (error) {
+            Alert.alert('Error', 'Connection error');
+          }
         }
+      }
       ]
     );
   };
@@ -228,19 +230,21 @@ export default function CalendarScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <Calendar
-        markedDates={markedDates}
-        onDayPress={handleDateSelect}
-        theme={{
-          todayTextColor: '#00adf5',
-          selectedDayBackgroundColor: '#00adf5',
-          selectedDayTextColor: '#ffffff',
-          dotColor: '#00adf5',
-          selectedDotColor: '#ffffff',
-          arrowColor: '#00adf5',
-          monthTextColor: '#2d5016',
-        }}
-      />
+      <Animated.View entering={ZoomIn.duration(600).springify()}>
+        <Calendar
+          markedDates={markedDates}
+          onDayPress={handleDateSelect}
+          theme={{
+            todayTextColor: '#00adf5',
+            selectedDayBackgroundColor: '#00adf5',
+            selectedDayTextColor: '#ffffff',
+            dotColor: '#00adf5',
+            selectedDotColor: '#ffffff',
+            arrowColor: '#00adf5',
+            monthTextColor: '#2d5016',
+          }}
+        />
+      </Animated.View>
 
       {!showForm && (
         <TouchableOpacity style={styles.addButtonContainer} onPress={() => setShowForm(true)}>
@@ -249,7 +253,7 @@ export default function CalendarScreen() {
       )}
 
       {showForm && (
-        <View style={styles.formContainer}>
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.formContainer}>
           <Text style={styles.label}>Selected Date: {selectedDate}</Text>
 
           <Text style={styles.label}>Event Type</Text>
@@ -295,15 +299,17 @@ export default function CalendarScreen() {
           <TouchableOpacity style={styles.cancelButton} onPress={() => setShowForm(false)}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
 
       {dayEvents.length > 0 && (
         <View style={styles.eventsListContainer}>
           <Text style={styles.eventsTitle}>Events for {selectedDate}:</Text>
           {dayEvents.map((event, index) => (
-            <View
+            <Animated.View
               key={index}
+              entering={FadeInRight.delay(index * 100).springify()}
+              layout={Layout.springify()}
               style={[
                 styles.eventItem,
                 { borderLeftColor: getEventColor(event.type) },
@@ -314,22 +320,22 @@ export default function CalendarScreen() {
               <TouchableOpacity onPress={() => handleDeleteEvent(event)} style={styles.deleteButton}>
                 <Ionicons name="trash-outline" size={20} color="#ef4444" />
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           ))}
         </View>
       )}
 
       {!showForm && (
-        <View style={styles.buttonRow}>
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: '#00adf5' }]} 
+        <Animated.View entering={FadeInDown.delay(300)} style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#00adf5' }]}
             onPress={() => setShowForm(true)}
           >
             <Text style={styles.buttonText}>Manual Add</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: '#6200ee' }]} 
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#6200ee' }]}
             onPress={handleAIScan}
             disabled={isScanning}
           >
@@ -337,10 +343,10 @@ export default function CalendarScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.buttonText}>Scan with AI</Text>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
       )}
-    </TouchableOpacity>
-  </View>
-)}
     </ScrollView>
   );
 }
@@ -478,6 +484,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#ddd',
     paddingHorizontal: 20,
+    paddingBottom: 40
   },
   eventsTitle: {
     fontSize: 16,
@@ -491,6 +498,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginBottom: 10,
     borderLeftWidth: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    elevation: 2
   },
   eventType: {
     fontSize: 12,
@@ -501,14 +512,15 @@ const styles = StyleSheet.create({
   eventDescription: {
     fontSize: 14,
     color: '#333',
+    flex: 1,
+    marginRight: 10
   },
   eventContent: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   deleteButton: {
     padding: 8,
-    marginLeft: 10,
   },
 });

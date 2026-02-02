@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSession } from '../../ctx';
 import { API_URL } from '../../config/api';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function Profile() {
   const { session, signOut } = useSession();
@@ -64,34 +65,44 @@ export default function Profile() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
+      <Animated.Text entering={FadeInDown.duration(600)} style={styles.title}>Profile</Animated.Text>
 
-      <Text style={styles.label}>Email</Text>
-      <Text style={styles.value}>{email}</Text>
+      <Animated.View entering={FadeInDown.delay(100).duration(600)}>
+        <Text style={styles.label}>Email</Text>
+        <Text style={styles.value}>{email}</Text>
+      </Animated.View>
 
-      <TextInput
-        placeholder="New password"
-        secureTextEntry
-        value={newPassword}
-        onChangeText={setNewPassword}
-        style={styles.input}
-      />
+      <Animated.View entering={FadeInDown.delay(200).duration(600)}>
+        <TextInput
+          placeholder="New password"
+          secureTextEntry
+          value={newPassword}
+          onChangeText={setNewPassword}
+          style={styles.input}
+        />
+      </Animated.View>
 
-      <TextInput
-        placeholder="Confirm new password"
-        secureTextEntry
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        style={styles.input}
-      />
+      <Animated.View entering={FadeInDown.delay(300).duration(600)}>
+        <TextInput
+          placeholder="Confirm new password"
+          secureTextEntry
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          style={styles.input}
+        />
+      </Animated.View>
 
-      <TouchableOpacity style={styles.button} onPress={changePassword}>
-        <Text style={styles.buttonText}>Change Password</Text>
-      </TouchableOpacity>
+      <Animated.View entering={FadeInDown.delay(400).duration(600)}>
+        <TouchableOpacity style={styles.button} onPress={changePassword}>
+          <Text style={styles.buttonText}>Change Password</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
-      <TouchableOpacity style={styles.logout} onPress={signOut}>
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </TouchableOpacity>
+      <Animated.View entering={FadeInDown.delay(500).duration(600)}>
+        <TouchableOpacity style={styles.logout} onPress={signOut}>
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }

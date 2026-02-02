@@ -1,34 +1,35 @@
 import React, { useState, useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker'
-import { 
+import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
-  TextInput, ActivityIndicator, Alert, Platform, StatusBar, KeyboardAvoidingView 
+  TextInput, ActivityIndicator, Alert, Platform, StatusBar, KeyboardAvoidingView
 } from 'react-native';
 import { useSession } from '../../ctx';
 import { useFocusEffect } from 'expo-router';
 import { API_URL } from '../../config/api';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown, SlideInRight, ZoomIn, Layout, FadeIn } from 'react-native-reanimated';
 
 const TOP_PADDING = Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 10;
 
 export default function TestGeneratorScreen() {
   const { session } = useSession();
-  
+
   const [upcomingTests, setUpcomingTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
 
   const [selectedTest, setSelectedTest] = useState<any>(null);
   const [context, setContext] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [numQuestions, setNumQuestions] = useState(5);
   const [images, setImages] = useState<string[]>([]);
-  
+
 
   const [quiz, setQuiz] = useState<any[] | null>(null);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [score, setScore] = useState<number | null>(null);
- 
+
   useFocusEffect(
     useCallback(() => {
       fetchTests();
@@ -41,8 +42,8 @@ export default function TestGeneratorScreen() {
         headers: { 'Authorization': `Bearer ${session}` }
       });
       const data = await response.json();
-      
-      const tests = Object.keys(data).flatMap(date => 
+
+      const tests = Object.keys(data).flatMap(date =>
         data[date].filter((e: any) => e.type === 'test')
           .map((e: any) => ({ ...e, date }))
       );
@@ -54,7 +55,7 @@ export default function TestGeneratorScreen() {
     }
   };
 
-    const takePhoto = async () => {
+  const takePhoto = async () => {
     if (images.length >= 2) {
       return Alert.alert("Limit Reached", "You can upload a maximum of 2 images.");
     }
@@ -79,24 +80,24 @@ export default function TestGeneratorScreen() {
     const newImages = [...images];
     newImages.splice(index, 1);
     setImages(newImages);
-  };  
+  };
 
   const generateQuiz = async () => {
     if (!context.trim() && images.length === 0) return Alert.alert("Context Required", "Please paste your study notes first.");
-    
+
     setIsGenerating(true);
     try {
       const response = await fetch(`${API_URL}/chat/generate-test`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session}` 
+          'Authorization': `Bearer ${session}`
         },
-        body: JSON.stringify({ 
-            subject: selectedTest.description,
-            context: context,
-            questionsCount: numQuestions,
-            images: images
+        body: JSON.stringify({
+          subject: selectedTest.description,
+          context: context,
+          questionsCount: numQuestions,
+          images: images
         }),
       });
       const data = await response.json();
@@ -110,7 +111,7 @@ export default function TestGeneratorScreen() {
 
   const calculateScore = async () => {
     if (Object.keys(userAnswers).length < (quiz?.length || 0)) {
-        return Alert.alert("Unfinished", "Please answer all questions before finishing.");
+      return Alert.alert("Unfinished", "Please answer all questions before finishing.");
     }
     let correctCount = 0;
     quiz?.forEach((q, index) => {
@@ -131,9 +132,9 @@ export default function TestGeneratorScreen() {
           total: quiz?.length
         })
       });
-      } catch (error) {
-        console.error("Failed to save score:", error);
-      }
+    } catch (error) {
+      console.error("Failed to save score:", error);
+    }
   };
 
   const resetQuiz = () => {
@@ -149,15 +150,21 @@ export default function TestGeneratorScreen() {
     return (
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
         <TouchableOpacity style={styles.backLink} onPress={resetQuiz}>
-            <Ionicons name="arrow-back" size={20} color="#2563eb" />
-            <Text style={styles.backLinkText}>Cancel</Text>
+          <Ionicons name="arrow-back" size={20} color="#2563eb" />
+          <Text style={styles.backLinkText}>Cancel</Text>
         </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Practice: {selectedTest.description}</Text>
-        <Text style={styles.subTitle}>Select the correct answer for each question.</Text>
+
+        <Animated.View entering={FadeInDown.duration(500)}>
+          <Text style={styles.headerTitle}>Practice: {selectedTest.description}</Text>
+          <Text style={styles.subTitle}>Select the correct answer for each question.</Text>
+        </Animated.View>
 
         {quiz.map((q, index) => (
-          <View key={index} style={styles.quizCard}>
+          <Animated.View
+            key={index}
+            entering={SlideInRight.delay(index * 150).springify()}
+            style={styles.quizCard}
+          >
             <Text style={styles.questionText}>{index + 1}. {q.question}</Text>
             {q.options.map((opt: string) => {
               let buttonStyle: any[] = [styles.optionBtn];
@@ -177,17 +184,17 @@ export default function TestGeneratorScreen() {
               }
 
               return (
-                <TouchableOpacity 
-                  key={opt} 
+                <TouchableOpacity
+                  key={opt}
                   style={buttonStyle}
-                  onPress={() => score === null && setUserAnswers({...userAnswers, [index]: opt})}
+                  onPress={() => score === null && setUserAnswers({ ...userAnswers, [index]: opt })}
                   disabled={score !== null}
                 >
                   <Text style={textStyle}>{opt}</Text>
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </Animated.View>
         ))}
 
         {score === null ? (
@@ -195,109 +202,116 @@ export default function TestGeneratorScreen() {
             <Text style={styles.btnText}>Finish and Calculate Score</Text>
           </TouchableOpacity>
         ) : (
-          <View style={styles.resultCard}>
+          <Animated.View entering={ZoomIn.duration(600).springify()} style={styles.resultCard}>
             <Text style={styles.scoreText}>Result: {score} / {quiz.length}</Text>
             <Text style={styles.scoreSubText}>
-                {score === quiz.length ? "Perfect! You are ready!" : "Review your mistakes in red above."}
+              {score === quiz.length ? "Perfect! You are ready!" : "Review your mistakes in red above."}
             </Text>
             <TouchableOpacity style={styles.resetBtn} onPress={resetQuiz}>
               <Text style={styles.btnText}>Try Another Topic</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} style={{flex:1}}>
-    <ScrollView style={styles.container}>
-      <Text style={styles.headerTitle}>AI Study Coach</Text>
-      <Text style={styles.subTitle}>Select an upcoming test to prepare.</Text>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} style={{ flex: 1 }}>
+      <ScrollView style={styles.container}>
+        <Animated.View entering={FadeInDown.duration(600)}>
+          <Text style={styles.headerTitle}>AI Study Coach</Text>
+          <Text style={styles.subTitle}>Select an upcoming test to prepare.</Text>
+        </Animated.View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#2563eb" style={{marginTop: 50}} />
-      ) : upcomingTests.length > 0 ? (
-        upcomingTests.map((test, i) => (
-            <TouchableOpacity 
-                key={i} 
-                style={[styles.testItem, selectedTest === test && styles.testSelected]} 
-                onPress={() => setSelectedTest(test)}
+        {loading ? (
+          <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 50 }} />
+        ) : upcomingTests.length > 0 ? (
+          upcomingTests.map((test, i) => (
+            <Animated.View
+              key={i}
+              entering={FadeInDown.delay(i * 100).duration(500)}
+              layout={Layout.springify()}
             >
-              <Ionicons name="school" size={24} color={selectedTest === test ? "#fff" : "#2563eb"} />
-              <View style={{marginLeft: 15}}>
-                <Text style={[styles.testName, selectedTest === test && {color: '#fff'}]}>{test.description}</Text>
-                <Text style={[styles.testDate, selectedTest === test && {color: 'rgba(255,255,255,0.7)'}]}>{test.date}</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-      ) : (
-        <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No upcoming tests found in your calendar.</Text>
-        </View>
-      )}
-
-      {selectedTest && (
-        <View style={styles.contextArea}>
-          <Text style={styles.label}>Paste Notes or Specific Topics:</Text>
-          <TextInput
-            style={styles.textArea}
-            placeholder="Example: The test covers the Water Cycle, condensation, and evaporation..."
-            multiline
-            value={context}
-            onChangeText={setContext}
-          />
-
-          <Text style={[styles.label, { marginTop: 20 }]}>Capture Notes (Max 2):</Text>
-          <View style={styles.imageRow}>
-            {images.map((img, index) => (
-              <View key={index} style={styles.imagePreviewContainer}>
-                <Image source={{ uri: `data:image/jpeg;base64,${img}` }} style={styles.previewImage} />
-                <TouchableOpacity style={styles.removeImgBtn} onPress={() => removeImage(index)}>
-                  <Ionicons name="close-circle" size={24} color="#ef4444" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            
-            {images.length < 2 && (
-              <TouchableOpacity style={styles.addImageBtn} onPress={takePhoto}>
-                <Ionicons name="camera" size={30} color="#64748b" />
-                <Text style={styles.addImageText}>Take Photo</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-
-          <Text style={[styles.label, { marginTop: 20 }]}>Number of Questions:</Text>
-          <View style={styles.countRow}>
-            {[5, 7, 10].map((num) => (
               <TouchableOpacity
-                key={num}
-                style={[
-                  styles.countBtn,
-                  numQuestions === num && styles.countBtnSelected
-                ]}
-                onPress={() => setNumQuestions(num)}
+                style={[styles.testItem, selectedTest === test && styles.testSelected]}
+                onPress={() => setSelectedTest(test)}
               >
-                <Text style={[
-                  styles.countBtnText,
-                  numQuestions === num && styles.countBtnTextSelected
-                ]}>
-                  {num}
-                </Text>
+                <Ionicons name="school" size={24} color={selectedTest === test ? "#fff" : "#2563eb"} />
+                <View style={{ marginLeft: 15 }}>
+                  <Text style={[styles.testName, selectedTest === test && { color: '#fff' }]}>{test.description}</Text>
+                  <Text style={[styles.testDate, selectedTest === test && { color: 'rgba(255,255,255,0.7)' }]}>{test.date}</Text>
+                </View>
               </TouchableOpacity>
-            ))}
+            </Animated.View>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No upcoming tests found in your calendar.</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.generateBtn} 
-            onPress={generateQuiz}
-            disabled={isGenerating}
-          >
-            {isGenerating ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Generate Practice Test</Text>}
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+        )}
+
+        {selectedTest && (
+          <Animated.View entering={FadeInDown.duration(500)} style={styles.contextArea}>
+            <Text style={styles.label}>Paste Notes or Specific Topics:</Text>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Example: The test covers the Water Cycle, condensation, and evaporation..."
+              multiline
+              value={context}
+              onChangeText={setContext}
+            />
+
+            <Text style={[styles.label, { marginTop: 20 }]}>Capture Notes (Max 2):</Text>
+            <View style={styles.imageRow}>
+              {images.map((img, index) => (
+                <View key={index} style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: `data:image/jpeg;base64,${img}` }} style={styles.previewImage} />
+                  <TouchableOpacity style={styles.removeImgBtn} onPress={() => removeImage(index)}>
+                    <Ionicons name="close-circle" size={24} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {images.length < 2 && (
+                <TouchableOpacity style={styles.addImageBtn} onPress={takePhoto}>
+                  <Ionicons name="camera" size={30} color="#64748b" />
+                  <Text style={styles.addImageText}>Take Photo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+
+            <Text style={[styles.label, { marginTop: 20 }]}>Number of Questions:</Text>
+            <View style={styles.countRow}>
+              {[5, 7, 10].map((num) => (
+                <TouchableOpacity
+                  key={num}
+                  style={[
+                    styles.countBtn,
+                    numQuestions === num && styles.countBtnSelected
+                  ]}
+                  onPress={() => setNumQuestions(num)}
+                >
+                  <Text style={[
+                    styles.countBtnText,
+                    numQuestions === num && styles.countBtnTextSelected
+                  ]}>
+                    {num}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={styles.generateBtn}
+              onPress={generateQuiz}
+              disabled={isGenerating}
+            >
+              {isGenerating ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Generate Practice Test</Text>}
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -331,9 +345,9 @@ const styles = StyleSheet.create({
   scoreSubText: { fontSize: 16, color: '#64748b', marginBottom: 25, textAlign: 'center' },
   resetBtn: { backgroundColor: '#334155', padding: 18, borderRadius: 16, width: '100%', alignItems: 'center' },
   countRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   countBtn: {
     flex: 1,
@@ -344,6 +358,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginRight: 10
   },
   countBtnSelected: {
     backgroundColor: '#2563eb',
@@ -356,30 +371,30 @@ const styles = StyleSheet.create({
   countBtnTextSelected: {
     color: '#fff',
   },
-  imageRow: { 
-    flexDirection: 'row', 
-    marginBottom: 15, 
+  imageRow: {
+    flexDirection: 'row',
+    marginBottom: 15,
     gap: 12,
-    alignItems: 'center' 
+    alignItems: 'center'
   },
-  imagePreviewContainer: { 
-    width: 90, 
-    height: 90, 
-    borderRadius: 15, 
-    overflow: 'hidden', 
+  imagePreviewContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 15,
+    overflow: 'hidden',
     position: 'relative',
     backgroundColor: '#e2e8f0'
   },
-  previewImage: { 
-    width: '100%', 
+  previewImage: {
+    width: '100%',
     height: '100%',
     resizeMode: 'cover'
   },
-  removeImgBtn: { 
-    position: 'absolute', 
-    top: -2, 
-    right: -2, 
-    backgroundColor: '#fff', 
+  removeImgBtn: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#fff',
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -387,21 +402,21 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3
   },
-  addImageBtn: { 
-    width: 90, 
-    height: 90, 
-    borderRadius: 15, 
-    borderWidth: 2, 
-    borderColor: '#cbd5e1', 
-    borderStyle: 'dashed', 
-    justifyContent: 'center', 
+  addImageBtn: {
+    width: 90,
+    height: 90,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f8fafc'
   },
-  addImageText: { 
-    fontSize: 11, 
-    color: '#64748b', 
-    marginTop: 4, 
-    fontWeight: '600' 
+  addImageText: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 4,
+    fontWeight: '600'
   },
 });

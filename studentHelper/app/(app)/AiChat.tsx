@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, 
-  TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, 
-  Alert, Modal, FlatList, StatusBar 
+import {
+  View, Text, StyleSheet, TouchableOpacity, Image, ScrollView,
+  TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
+  Alert, Modal, FlatList, StatusBar
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../../config/api';
 import { useSession } from '../../ctx';
 import Markdown from 'react-native-markdown-display'
+import Animated, { FadeInUp, SlideInLeft, SlideInRight, Layout } from 'react-native-reanimated';
 
 const TOP_PADDING = Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10;
 
@@ -16,7 +17,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  image?: string; 
+  image?: string;
 }
 
 interface ChatSession {
@@ -115,10 +116,10 @@ export default function ExamTutorScreen() {
     updateLocalMessages(targetSessionId, userMsg);
     const b64 = selectedImage?.base64;
     const textToSend = inputText;
-    
+
     setInputText('');
     setSelectedImage(null);
-    
+
     await sendToAI(targetSessionId, b64, textToSend);
   };
 
@@ -127,19 +128,19 @@ export default function ExamTutorScreen() {
     try {
       const response = await fetch(`${API_URL}/chat/message`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${session}`,
-          'Content-Type': 'application/json' 
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ session_id: sessionId, image: imageB64, message: text }),
       });
 
       const data = await response.json();
       if (response.ok) {
-        const aiMsg: Message = { 
-          id: data.id.toString(), 
-          role: 'assistant', 
-          content: data.reply 
+        const aiMsg: Message = {
+          id: data.id.toString(),
+          role: 'assistant',
+          content: data.reply
         };
         updateLocalMessages(sessionId, aiMsg);
       }
@@ -157,7 +158,7 @@ export default function ExamTutorScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setIsHistoryVisible(true)}>
           <Ionicons name="menu-outline" size={30} color="#1e293b" />
@@ -166,52 +167,57 @@ export default function ExamTutorScreen() {
           <Ionicons name="add-circle-outline" size={30} color="#2563eb" />
         </TouchableOpacity>
       </View>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} style={{flex:1}}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} style={{ flex: 1 }}>
         <ScrollView ref={scrollViewRef} onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} contentContainerStyle={styles.chatList}>
           {!currentChat || currentChat.messages.length === 0 ? (
-            <View style={styles.welcomeContainer}>
+            <Animated.View entering={FadeInUp.duration(600).springify()} style={styles.welcomeContainer}>
               <Ionicons name="chatbubbles-outline" size={80} color="#cbd5e1" />
               <Text style={styles.welcomeTitle}>New Conversation</Text>
               <Text style={styles.welcomeSub}>Send a message!</Text>
-            </View>
+            </Animated.View>
           ) : (
             currentChat.messages.map((msg) => (
-              <View key={msg.id} style={[styles.msgWrapper, msg.role === 'user' ? styles.userRow : styles.aiRow]}>
+              <Animated.View
+                key={msg.id}
+                entering={msg.role === 'user' ? SlideInRight.duration(400) : SlideInLeft.duration(400)}
+                layout={Layout.springify()}
+                style={[styles.msgWrapper, msg.role === 'user' ? styles.userRow : styles.aiRow]}
+              >
                 <View style={[styles.bubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
                   {msg.image && <Image source={{ uri: msg.image }} style={styles.chatImage} />}
                   <Text style={[styles.msgText, msg.role === 'user' ? styles.userText : styles.aiText]}>
                     <Markdown>{msg.content}</Markdown>
                   </Text>
                 </View>
-              </View>
+              </Animated.View>
             ))
           )}
           {loading && <ActivityIndicator color="#2563eb" style={{ alignSelf: 'flex-start', marginLeft: 20, marginTop: 10 }} />}
         </ScrollView>
 
-          {selectedImage && (
-            <View style={styles.imagePreviewContainer}>
-              <Image source={{ uri: selectedImage.uri }} style={styles.smallPreview} />
-              <TouchableOpacity style={styles.removeImage} onPress={() => setSelectedImage(null)}>
-                <Ionicons name="close-circle" size={24} color="#ef4444" />
-              </TouchableOpacity>
-            </View>
-          )}
-          <View style={styles.inputContainer}>
-            <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}>
-              <Ionicons name="image-outline" size={28} color="#64748b" />
-            </TouchableOpacity>
-            <TextInput 
-              style={styles.textInput} 
-              placeholder="Type a message..." 
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-            />
-            <TouchableOpacity style={styles.sendIcon} onPress={handleSendMessage}>
-              <Ionicons name="paper-plane" size={20} color="#fff" />
+        {selectedImage && (
+          <View style={styles.imagePreviewContainer}>
+            <Image source={{ uri: selectedImage.uri }} style={styles.smallPreview} />
+            <TouchableOpacity style={styles.removeImage} onPress={() => setSelectedImage(null)}>
+              <Ionicons name="close-circle" size={24} color="#ef4444" />
             </TouchableOpacity>
           </View>
+        )}
+        <Animated.View entering={FadeInUp.duration(500).delay(200)} style={styles.inputContainer}>
+          <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}>
+            <Ionicons name="image-outline" size={28} color="#64748b" />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type a message..."
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+          />
+          <TouchableOpacity style={styles.sendIcon} onPress={handleSendMessage}>
+            <Ionicons name="paper-plane" size={20} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
       </KeyboardAvoidingView>
 
       <Modal visible={isHistoryVisible} animationType="fade" transparent={true}>
@@ -222,8 +228,8 @@ export default function ExamTutorScreen() {
               data={sessions}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={[styles.historyCard, currentSessionId === item.id && styles.activeCard]} 
+                <TouchableOpacity
+                  style={[styles.historyCard, currentSessionId === item.id && styles.activeCard]}
                   onPress={() => { setCurrentSessionId(item.id); setIsHistoryVisible(false); }}
                 >
                   <Ionicons name="chatbox-ellipses-outline" size={20} color="#64748b" />
