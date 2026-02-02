@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Platform, StatusBar, ActivityIndicator 
+import React, { useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Platform, StatusBar, ActivityIndicator
 } from 'react-native';
 import { useSession } from '../../ctx';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../../config/api';
 import { useCallback } from 'react';
-import { useFocusEffect } from 'expo-router'; 
+import { useFocusEffect } from 'expo-router';
 
 const TOP_PADDING = Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10;
 
@@ -17,13 +17,27 @@ export default function HomePage() {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [scores, setScores] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [recents, setRecents] = useState<any[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       fetchUpcomingEvents();
       fetchScores();
+      fetchRecents();
     }, [session])
   );
+
+  const fetchRecents = async () => {
+    try {
+      const res = await fetch(`${API_URL}/schoolwork/recents`, {
+        headers: { 'Authorization': `Bearer ${session}` }
+      });
+      const data = await res.json();
+      if (res.ok) setRecents(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchUpcomingEvents = async () => {
     try {
@@ -31,13 +45,13 @@ export default function HomePage() {
         headers: { 'Authorization': `Bearer ${session}` }
       });
       const data = await response.json();
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const formatted = Object.keys(data).flatMap(dateStr => {
-        const eventDate = new Date(dateStr + "T00:00:00"); 
-    
+        const eventDate = new Date(dateStr + "T00:00:00");
+
         const diffTime = eventDate.getTime() - today.getTime();
         const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
@@ -65,14 +79,14 @@ export default function HomePage() {
         headers: { 'Authorization': `Bearer ${session}` }
       });
       const data = await response.json();
-      setScores(data); 
+      setScores(data);
     } catch (e) {
       console.error("Failed to fetch scores", e);
     }
   };
 
   const handleSignOut = () => {
-    signOut();        
+    signOut();
     router.replace('/sign-in');
   };
 
@@ -116,6 +130,31 @@ export default function HomePage() {
         </TouchableOpacity>
       </View>
 
+      {recents.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Insights</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingLeft: 20 }}>
+            {recents.map((item, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.recentCard}
+                onPress={() => router.push({ pathname: '/schoolwork', params: { analysisId: item.id } })}
+              >
+                <View style={styles.recentHeader}>
+                  <Ionicons name="sparkles" size={16} color="#fbbf24" />
+                  <Text style={styles.recentDate}>{item.date}</Text>
+                </View>
+                <Text style={styles.recentSubject} numberOfLines={1}>{item.subject}</Text>
+                <Text style={styles.recentDesc} numberOfLines={2}>
+                  {item.topic || item.type.replace('_', ' ')}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <View style={{ width: 40 }} />
+          </ScrollView>
+        </View>
+      )}
+
       <View style={styles.listSection}>
         <Text style={styles.sectionTitle}>Agenda</Text>
         {upcomingEvents.slice(1, 4).map((item, index) => (
@@ -147,7 +186,7 @@ export default function HomePage() {
           </View>
         </View>
       </View>
-      <View style={{ height: 40 }} /> 
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
@@ -165,18 +204,19 @@ const styles = StyleSheet.create({
   actionGrid: { flexDirection: 'row', paddingHorizontal: 20, gap: 15 },
   actionBtn: { flex: 1, backgroundColor: '#fff', padding: 20, borderRadius: 20, alignItems: 'center', elevation: 2 },
   actionText: { marginTop: 8, fontWeight: '600', color: '#1e293b' },
-  listSection: { paddingHorizontal: 20, paddingVertical: 10 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 15 },
+  section: { marginTop: 25 },
+  listSection: { paddingHorizontal: 20, paddingVertical: 10, marginTop: 10 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 15, paddingHorizontal: 20 },
   listItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 16, marginBottom: 10 },
   itemTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
   itemDate: { fontSize: 12, color: '#94a3b8' },
   daysTag: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   daysTagText: { fontWeight: 'bold', color: '#64748b' },
   scoreSection: { paddingHorizontal: 20, marginBottom: 20 },
-  scoreCard: { 
-    flexDirection: 'row', 
-    backgroundColor: '#fff', 
-    borderRadius: 20, 
+  scoreCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 20,
     padding: 20,
     elevation: 2,
     shadowColor: '#000',
@@ -186,5 +226,20 @@ const styles = StyleSheet.create({
   scoreItem: { flex: 1, alignItems: 'center' },
   scoreBorder: { borderLeftWidth: 1, borderLeftColor: '#f1f5f9' },
   scoreValue: { fontSize: 24, fontWeight: 'bold', color: '#1e293b' },
-  scoreLabel: { fontSize: 12, color: '#64748b', marginTop: 4 }
+  scoreLabel: { fontSize: 12, color: '#64748b', marginTop: 4 },
+  recentCard: {
+    width: 160,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 15,
+    marginRight: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8
+  },
+  recentHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  recentDate: { fontSize: 10, color: '#94a3b8', fontWeight: 'bold' },
+  recentSubject: { fontSize: 14, fontWeight: 'bold', color: '#1e293b', marginBottom: 4 },
+  recentDesc: { fontSize: 12, color: '#64748b' }
 });
