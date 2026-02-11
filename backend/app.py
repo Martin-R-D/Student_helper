@@ -3,11 +3,13 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.pool import NullPool
 from sqlalchemy import func, cast, Float
 from dotenv import load_dotenv
 from datetime import timedelta, timezone, datetime
 from google import genai
 from google.genai import types
+from werkzeug.exceptions import HTTPException
 import os
 import base64
 import json
@@ -18,22 +20,38 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-events = {}
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///db.sqlite3"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["JWT_SECRET_KEY"] = "unique_key_123"
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY')
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
-
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "poolclass": NullPool,
+    "connect_args": {
+        "prepare_threshold": None
+    }
+}
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
 
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    if isinstance(e, HTTPException):
+        return e
+    
+    print(f"SERVER CRASH: {e}") 
+    
+    return {"error": "An unexpected error occurred on the server"}, 500
+
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(512), nullable=False)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -709,8 +727,9 @@ def get_schoolwork_detail(id):
         "date": item.created_at.strftime("%Y-%m-%d")
     })
 
+
+with app.app_context():
+    db.create_all() 
+
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all() 
-        
     app.run(host="0.0.0.0", port=5000, debug=True)
