@@ -115,11 +115,11 @@ def smart_sync(user_id):
     
     if len(existing['ids']) == 0:
         print(f"ChromaDB is empty for user {user_id}. Fetching from SQL...")
-        user_events = db.session.query(Event).filter_by(user_id=int(user_id)).order_by(Event.id.desc()).all()
+        user_events = db.session.query(Event).filter_by(user_id=int(user_id)).order_by(Event.id.desc()).limit(10).all()
             
         if user_events:
             collection.add(
-                ids=[str(e.id) for e in user_events],
+                ids=[f"u{user_id}_e{e.id}" for e in user_events],
                 documents=[f"Date: {e.date}, Type: {e.type}, Task: {e.description}" for e in user_events],
                 metadatas=[{"user_id": str(user_id), "event_id": str(e.id)} for e in user_events]
             )
@@ -383,7 +383,7 @@ def handle_chat():
     if user_text:
         search_results = collection.query(
             query_texts=[user_text], 
-            n_results=10, 
+            n_results=7, 
             where={"user_id": str(user_id)} 
         )
         relevant_docs = []
