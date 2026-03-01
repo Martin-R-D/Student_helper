@@ -20,8 +20,6 @@ import os
 import base64
 import json
 import re
-import chromadb
-from chromadb.utils import embedding_functions
 
 load_dotenv()
 
@@ -42,16 +40,6 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
-
-
-os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
-# os.environ["GOOGLE_GENAI_API_VERSION"] = "v1"
-
-gemini_ef  = embedding_functions.GoogleGenaiEmbeddingFunction(model_name="models/gemini-embedding-001")
-
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
-collection = chroma_client.get_or_create_collection(name="user_events", embedding_function=gemini_ef)
-chat_collection = chroma_client.get_or_create_collection(name="chat_history", embedding_function=gemini_ef)
 
 
 @app.errorhandler(Exception)
@@ -107,30 +95,6 @@ class Score(db.Model):
     score_value = db.Column(db.Integer, nullable=False)
     total = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-
-
-
-def smart_sync(user_id):
-    try:
-        user_id_str = str(user_id)
-        
-        user_events = Event.query.filter_by(user_id=int(user_id)).all()
-        
-        existing = collection.get(where={"user_id": user_id_str})
-        
-        if len(existing['ids']) != len(user_events):
-            if len(existing['ids']) > 0:
-                collection.delete(where={"user_id": user_id_str})
-            if user_events:
-                collection.add(
-                    ids=[f"u{user_id_str}_e{e.id}" for e in user_events],
-                    documents=[f"Date: {e.date}, Task: {e.description}" for e in user_events],
-                    metadatas=[{"user_id": user_id_str} for e in user_events]
-                )
-            
-    except Exception:
-        pass
-
 
 @app.post("/auth/register")
 def register():
@@ -340,57 +304,65 @@ def handle_chat():
     db.session.add(user_db_msg)
     db.session.commit() 
 
+    context = ""
     try:
-        smart_sync(user_id)
-        search_results = collection.query(
-            query_texts=[user_text], 
-            n_results=5, 
-            where={"user_id": user_id} 
-        )
-        context = ""
-        if search_results['documents'] and search_results['documents'][0]:
-            relevant = [doc for doc, dist in zip(search_results['documents'][0], search_results['distances'][0]) if dist <= 1.5]
-            if relevant:
-                context = "\nCalendar Context:\n" + "\n".join(relevant)
-    except:
-        context = ""
+        recent_events = Event.query.filter_by(user_id=int(user_id))\
+            .order_by(Event.date.desc())\
+            .limit(4).all()
+        
+        if recent_events:
+            events_list = [f"- {e.date}: {e.description} ({e.type})" for e in recent_events]
+            context = "\nRecent Calendar Events:\n" + "\n".join(events_list)
+    except Exception as e:
+        print(f"SQL Context Error: {e}")
 
-    past_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.id.desc()).limit(7).all()
-    gemini_history = []
-    for m in reversed(past_messages[1:]): 
-        role = "user" if m.role == "user" else "model"
-        gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=m.content)]))
+    current_parts = []
+    if user_text:
+        current_parts.append(types.Part.from_text(text=user_text))
 
-    current_parts = [types.Part.from_text(text=user_text)] if user_text else []
     if image_b64:
         try:
-            if "," in image_b64: image_b64 = image_b64.split(",")[1]
+            if "," in image_b64:
+                image_b64 = image_b64.split(",")[1]
             image_data = base64.b64decode(image_b64.strip())
             current_parts.append(types.Part.from_bytes(data=image_data, mime_type="image/jpeg"))
-            if not user_text: current_parts.insert(0, types.Part.from_text(text="Describe this."))
-        except: pass
+            if not user_text:
+                current_parts.insert(0, types.Part.from_text(text="Describe this image."))
+        except:
+            pass
 
     try:
-        chat = client.chats.create(
+        now = datetime.now()
+        today_str = now.strftime("%Y-%m-%d")
+        
+        response = client.models.generate_content(
             model="gemini-2.5-flash",
             config=types.GenerateContentConfig(
-                system_instruction=f"Concise student assistant. Date: {datetime.now().date()}. {context}. Use backticks for math.",
-                max_output_tokens=400
+                system_instruction=f"""
+                You are a helpful student assistant. 
+                Today is {today_str}. 
+                {context}
+                Keep answers very short. Use backticks for math: `x^2`.
+                """,
+                max_output_tokens=250
             ),
-            history=gemini_history
+            contents=[types.Content(role="user", parts=current_parts)]
         )
-        response = chat.send_message(message=current_parts)
+        
         ai_reply = response.text
 
         ai_db_msg = ChatMessage(session_id=session_id, role='assistant', content=ai_reply)
         db.session.add(ai_db_msg)
         db.session.commit()
 
-        return jsonify({"status": "success", "reply": ai_reply})
+        return jsonify({
+            "status": "success", 
+            "reply": ai_reply
+        })
 
     except Exception as e:
         print(f"AI Error: {e}")
-        return jsonify({"error": "AI is busy, try again."}), 500
+        return jsonify({"error": "AI failed to respond. Please try again."}), 500
 
 
 
