@@ -322,130 +322,75 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 @jwt_required()
 def handle_chat():
     user_id = str(get_jwt_identity())
-    smart_sync(user_id)
     data_in = request.json
     
     session_id = data_in.get("session_id")
     image_b64 = data_in.get("image")
     user_text = data_in.get("message", "").strip()
 
-    now = datetime.now(timezone.utc)
-    today_str = now.strftime("%Y-%m-%d")
-    day_name = now.strftime("%A")
-
-
     if not user_text and not image_b64:
         return jsonify({"error": "Empty message"}), 400
 
     chat_session = db.session.get(ChatSession, session_id)
     if not chat_session:
-        title_preview = user_text[:30] if user_text else "Image Shared"
-        chat_session = ChatSession(id=session_id, user_id=user_id, title=title_preview)
+        chat_session = ChatSession(id=session_id, user_id=user_id, title=user_text[:30] or "Image Session")
         db.session.add(chat_session)
-        db.session.flush()
-
     
-    user_db_msg = ChatMessage(session_id=session_id, role='user', content=user_text)
+    user_db_msg = ChatMessage(session_id=session_id, role='user', content=user_text or "[Image]")
     db.session.add(user_db_msg)
-    db.session.flush()
+    db.session.commit() 
 
-    chat_collection.add(
-        ids=[str(chat_session.id) + "_" + str(user_db_msg.id)],
-        documents=[user_text],
-        metadatas=[{"role":"user", "user_id":str(user_id), "session_id":str(chat_session.id)}]
-    )
-
-    context = ""
-    if user_text:
+    try:
+        smart_sync(user_id)
         search_results = collection.query(
             query_texts=[user_text], 
-            n_results=7, 
-            where={"user_id": str(user_id)} 
+            n_results=5, 
+            where={"user_id": user_id} 
         )
-        relevant_docs = []
+        context = ""
         if search_results['documents'] and search_results['documents'][0]:
-            print(len(search_results['documents'][0]))
-            print(search_results['distances'])
-            for doc, distance in zip(search_results['documents'][0], search_results['distances'][0]):
-                if distance <= 1.5:
-                    relevant_docs.append(doc)
+            relevant = [doc for doc, dist in zip(search_results['documents'][0], search_results['distances'][0]) if dist <= 1.5]
+            if relevant:
+                context = "\nCalendar Context:\n" + "\n".join(relevant)
+    except:
+        context = ""
 
-            if relevant_docs:
-                context += "\nUse this relevant context from your calendar:\n" + "\n".join(relevant_docs)
-                print(context)
+    past_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.id.desc()).limit(7).all()
+    gemini_history = []
+    for m in reversed(past_messages[1:]): 
+        role = "user" if m.role == "user" else "model"
+        gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=m.content)]))
 
-    current_parts = []
-    if user_text:
-        current_parts.append(types.Part.from_text(text=user_text))
-    
+    current_parts = [types.Part.from_text(text=user_text)] if user_text else []
     if image_b64:
-        if "," in image_b64:
-            image_b64 = image_b64.split(",")[1]
-        
-        image_data = base64.b64decode(image_b64.strip())
-        current_parts.append(types.Part.from_bytes(data=image_data, mime_type="image/jpeg"))
-        
-        if not user_text:
-            current_parts.insert(0, types.Part.from_text(text="Describe this image."))
-
-    models_to_try = [
-        "gemini-flash-latest", 
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite"  
-    ]
-
-    ai_reply = None
-    last_error = None
-
-    for model_name in models_to_try:
         try:
-            print(f"Trying chat with model: {model_name}")
-            chat = client.chats.create(
-                model=model_name,
-                config=types.GenerateContentConfig(
-                    system_instruction=f"""
-                    You are a helpful student assistant, focus on giving short and clear answers. 
-                    Note that today's date is : {today_str} ({day_name}).
-                    {context}.
-                    IMPORTANT: Always format mathematical formulas using standard Markdown code blocks or inline backticks. 
-                    Example: `x = y^2`. Strictly avoid LaTeX symbols like $, $$.
-                    """
-                )
-            )
+            if "," in image_b64: image_b64 = image_b64.split(",")[1]
+            image_data = base64.b64decode(image_b64.strip())
+            current_parts.append(types.Part.from_bytes(data=image_data, mime_type="image/jpeg"))
+            if not user_text: current_parts.insert(0, types.Part.from_text(text="Describe this."))
+        except: pass
 
-            response = chat.send_message(message=current_parts)
-            ai_reply = response.text
-            break 
+    try:
+        chat = client.chats.create(
+            model="gemini-2.5-flash",
+            config=types.GenerateContentConfig(
+                system_instruction=f"Concise student assistant. Date: {datetime.now().date()}. {context}. Use backticks for math.",
+                max_output_tokens=400
+            ),
+            history=gemini_history
+        )
+        response = chat.send_message(message=current_parts)
+        ai_reply = response.text
 
-        except Exception as e:
-            print(f"Model {model_name} failed: {e}")
-            last_error = e
-            continue
-
-    if not ai_reply:
-        return jsonify({"error": f"All AI models failed. Last error: {str(last_error)}"}), 500
-
-    try: 
         ai_db_msg = ChatMessage(session_id=session_id, role='assistant', content=ai_reply)
         db.session.add(ai_db_msg)
-        db.session.flush()
-        chat_collection.add(
-            ids=[str(chat_session.id) + "_" + str(ai_db_msg.id) + "1"],
-            documents=[ai_db_msg.content],
-            metadatas=[{"role":"ai", "user_id":str(user_id), "session_id":str(chat_session.id)}]
-        )
-
         db.session.commit()
 
-        return jsonify({
-            "status": "success", 
-            "id": ai_db_msg.id, 
-            "reply": ai_reply
-        })
+        return jsonify({"status": "success", "reply": ai_reply})
 
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"error": str(e)}), 500
+        print(f"AI Error: {e}")
+        return jsonify({"error": "AI is busy, try again."}), 500
 
 
 
