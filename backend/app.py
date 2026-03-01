@@ -344,21 +344,7 @@ def handle_chat():
         db.session.add(chat_session)
         db.session.flush()
 
-    gemini_history = []
-
-    if user_text:
-        history_results = chat_collection.query(
-            query_texts=[user_text],
-            n_results = 10,
-            where = {"$and": [{"user_id":user_id}, {"session_id":str(chat_session.id)}]}
-        )
-        if history_results['documents'] and history_results['documents'][0]:
-            for doc, meta, dist in zip(history_results['documents'][0], history_results['metadatas'][0], history_results['distances'][0]):
-                if dist <= 1:
-                    role = "user" if meta['role'] == "user" else "model"
-                    gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=doc)]))
-
-    print(f"GEN history len: {len(gemini_history)}")
+    
     user_db_msg = ChatMessage(session_id=session_id, role='user', content=user_text)
     db.session.add(user_db_msg)
     db.session.flush()
@@ -424,8 +410,7 @@ def handle_chat():
                     IMPORTANT: Always format mathematical formulas using standard Markdown code blocks or inline backticks. 
                     Example: `x = y^2`. Strictly avoid LaTeX symbols like $, $$.
                     """
-                ),
-                history=gemini_history
+                )
             )
 
             response = chat.send_message(message=current_parts)
