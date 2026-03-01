@@ -43,10 +43,15 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
+
+os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
+# os.environ["GOOGLE_GENAI_API_VERSION"] = "v1"
+
+gemini_ef  = embedding_functions.GoogleGenaiEmbeddingFunction(model_name="models/gemini-embedding-001")
+
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
-sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-collection = chroma_client.get_or_create_collection(name="user_events", embedding_function=sentence_transformer_ef)
-chat_collection = chroma_client.get_or_create_collection(name="chat_history", embedding_function=sentence_transformer_ef)
+collection = chroma_client.get_or_create_collection(name="user_events", embedding_function=gemini_ef)
+chat_collection = chroma_client.get_or_create_collection(name="chat_history", embedding_function=gemini_ef)
 
 
 @app.errorhandler(Exception)
@@ -866,7 +871,7 @@ with app.app_context():
 
     collection = chroma_client.get_or_create_collection(
         name="user_events", 
-        embedding_function=sentence_transformer_ef
+        embedding_function=gemini_ef
     )
     
     if collection.count() == 0:
@@ -875,7 +880,7 @@ with app.app_context():
         if all_events:
             collection.add(
                 ids=[str(e.id) for e in all_events],
-                documents=[f"Date: {e.date}, Task: {e.description}" for e in all_events],
+                documents=[f"Date: {e.date}, Type: {e.type}, Task: {e.description}" for e in all_events],
                 metadatas=[{"user_id": str(e.user_id)} for e in all_events]
             )
             print(f"Synced {len(all_events)} events to ChromaDB.")
