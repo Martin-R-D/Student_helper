@@ -111,19 +111,25 @@ class Score(db.Model):
 
 
 def smart_sync(user_id):
-    existing = collection.get(where={"user_id": str(user_id)})
-    
-    if len(existing['ids']) == 0:
-        print(f"ChromaDB is empty for user {user_id}. Fetching from SQL...")
-        user_events = db.session.query(Event).filter_by(user_id=int(user_id)).order_by(Event.id.desc()).limit(10).all()
+    try:
+        user_id_str = str(user_id)
+        
+        user_events = Event.query.filter_by(user_id=int(user_id)).all()
+        
+        existing = collection.get(where={"user_id": user_id_str})
+        
+        if len(existing['ids']) != len(user_events):
+            if len(existing['ids']) > 0:
+                collection.delete(where={"user_id": user_id_str})
+            if user_events:
+                collection.add(
+                    ids=[f"u{user_id_str}_e{e.id}" for e in user_events],
+                    documents=[f"Date: {e.date}, Task: {e.description}" for e in user_events],
+                    metadatas=[{"user_id": user_id_str} for e in user_events]
+                )
             
-        if user_events:
-            collection.add(
-                ids=[f"u{user_id}_e{e.id}" for e in user_events],
-                documents=[f"Date: {e.date}, Type: {e.type}, Task: {e.description}" for e in user_events],
-                metadatas=[{"user_id": str(user_id), "event_id": str(e.id)} for e in user_events]
-            )
-            print(f"Successfully synced {len(user_events)} events.")
+    except Exception:
+        pass
 
 
 @app.post("/auth/register")
@@ -210,12 +216,6 @@ def create_event():
         db.session.add(new_event)
         db.session.commit()
 
-        collection.add(
-            ids=[str(new_event.id)],
-            documents=[f"Date: {new_event.date}, Task: {new_event.description}"],
-            metadatas=[{"user_id": str(current_user_id)}]
-        )
-        print("Event added")
         return {
             "message": "Event created successfully",
             "data": {
@@ -240,38 +240,28 @@ def delete_event():
     date = data.get('date')
     description = data.get('description')
 
-    print(f"DELETE REQUEST: id={event_id}, date={date}, desc={description}")
-
     event_to_delete = None
 
     if event_id:
-        print(f"Attempting delete by ID: {event_id}")
         event_to_delete = Event.query.filter_by(id=event_id, user_id=current_user_id).first()
     elif date and description:
-        print(f"Attempting delete by Date/Desc (Fallback): {date}, {description}")
         event_to_delete = Event.query.filter_by(
             user_id=current_user_id,
             date=date,
             description=description
         ).first()
     else:
-        print("Missing deletion criteria")
         return jsonify({"error": "Missing event ID, or date and description"}), 400
 
     if not event_to_delete:
-        print("Event not found in DB")
         return jsonify({"error": "Event not found"}), 404
     
     try:
-        print(f"Deleting event: {event_to_delete.id}")
         db.session.delete(event_to_delete)
         db.session.commit()
 
-        collection.delete(ids=[str(event_to_delete.id)])
-
         return jsonify({"success": True, "message": "Event deleted"}), 200
     except Exception as e:
-        print(f"Delete Exception: {e}")
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
