@@ -109,6 +109,23 @@ class Score(db.Model):
     timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+
+def smart_sync(user_id):
+    existing = collection.get(where={"user_id": str(user_id)})
+    
+    if len(existing['ids']) == 0:
+        print(f"ChromaDB is empty for user {user_id}. Fetching from SQL...")
+        user_events = db.session.query(Event).filter_by(user_id=int(user_id)).order_by(Event.id.desc()).all()
+            
+        if user_events:
+            collection.add(
+                ids=[str(e.id) for e in user_events],
+                documents=[f"Date: {e.date}, Type: {e.type}, Task: {e.description}" for e in user_events],
+                metadatas=[{"user_id": str(user_id), "event_id": str(e.id)} for e in user_events]
+            )
+            print(f"Successfully synced {len(user_events)} events.")
+
+
 @app.post("/auth/register")
 def register():
     data = request.get_json()
@@ -315,6 +332,7 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 @jwt_required()
 def handle_chat():
     user_id = str(get_jwt_identity())
+    smart_sync(user_id)
     data_in = request.json
     
     session_id = data_in.get("session_id")
@@ -868,24 +886,6 @@ def get_schoolwork_detail(id):
 
 with app.app_context():
     db.create_all() 
-
-    collection = chroma_client.get_or_create_collection(
-        name="user_events", 
-        embedding_function=gemini_ef
-    )
-    
-    if collection.count() == 0:
-        print("ChromaDB is empty. Syncing from SQL...")
-        all_events = Event.query.all()
-        if all_events:
-            collection.add(
-                ids=[str(e.id) for e in all_events],
-                documents=[f"Date: {e.date}, Type: {e.type}, Task: {e.description}" for e in all_events],
-                metadatas=[{"user_id": str(e.user_id)} for e in all_events]
-            )
-            print(f"Synced {len(all_events)} events to ChromaDB.")
-    else:
-        print(f"ChromaDB already contains {collection.count()} events. Skipping sync.")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
