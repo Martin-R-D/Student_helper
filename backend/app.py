@@ -357,6 +357,7 @@ def handle_chat():
 
         return jsonify({
             "status": "success", 
+            "id": ai_db_msg.id,
             "reply": ai_reply
         })
 
