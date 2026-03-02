@@ -454,11 +454,6 @@ def extract_events():
             db.session.add(new_event)
             db.session.flush()
 
-            collection.add(
-                ids=[str(new_event.id)],
-                documents=[f"Date: {item['date']}, Type: {item['type']}, Task: {item['description']}"],
-                metadatas=[{"user_id": str(current_user_id)}]
-            )
             added_events.append(item)
             print("Event added")
 
